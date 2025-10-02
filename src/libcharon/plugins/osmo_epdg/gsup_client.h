@@ -82,10 +82,11 @@ struct osmo_epdg_gsup_client_t {
 	/**
 	 * Tunnel Request
 	 *
+	 * @param pdp_type	PDP type (IPv4, IPv6, or IPv4v6)
 	 * @return		NULL or the osmo_gsup_message
 	 */
 	osmo_epdg_gsup_response_t *(*tunnel_request)(osmo_epdg_gsup_client_t *this,
-			const char *imsi);
+			const char *imsi, uint8_t pdp_type);
 
 	/**
 	 * Destroy a osmo_epdg_gsup_client_t.

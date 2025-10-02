@@ -144,7 +144,29 @@ METHOD(listener_t, authorize, bool,
 	}
 
 	ue->set_state(ue, UE_WAIT_TUNNEL);
-	resp = this->gsup->tunnel_request(this->gsup, imsi);
+	
+	/* Determine PDP type based on requested address family */
+	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4; /* Default to IPv4 */
+	ike_cfg_t *ike_cfg = ike_sa->get_ike_cfg(ike_sa);
+	if (ike_cfg)
+	{
+		host_t *local = ike_cfg->get_my_addr(ike_cfg);
+		host_t *remote = ike_cfg->get_other_addr(ike_cfg);
+		
+		/* Check if any of the addresses is IPv6 */
+		if ((local && local->get_family(local) == AF_INET6) ||
+		    (remote && remote->get_family(remote) == AF_INET6))
+		{
+			pdp_type = PDP_TYPE_N_IETF_IPv6;
+			DBG1(DBG_NET, "epdg_listener: Detected IPv6 tunnel request, using PDP_TYPE_N_IETF_IPv6");
+		}
+		else
+		{
+			DBG1(DBG_NET, "epdg_listener: Detected IPv4 tunnel request, using PDP_TYPE_N_IETF_IPv4");
+		}
+	}
+	
+	resp = this->gsup->tunnel_request(this->gsup, imsi, pdp_type);
 	if (!resp)
 	{
 		DBG1(DBG_NET, "epdg_listener: Tunnel Request: GSUP: couldn't send.");
@@ -165,18 +187,38 @@ METHOD(listener_t, authorize, bool,
 	/* validate Tunnel Response */
 	if ((resp->gsup.num_pdp_infos != 1) ||
 	    (!resp->gsup.pdp_infos[0].have_info) ||
-	    (resp->gsup.pdp_infos[0].pdp_type_org != PDP_TYPE_ORG_IETF) ||
-	    (resp->gsup.pdp_infos[0].pdp_type_nr != PDP_TYPE_N_IETF_IPv4))
+	    (resp->gsup.pdp_infos[0].pdp_type_org != PDP_TYPE_ORG_IETF))
 	{
 		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: received incomplete message/wrong content", imsi);
 		goto err;
 	}
 
 	pdp_info = &resp->gsup.pdp_infos[0];
-	/* if the sa_family is set, the address is valid */
-	if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET)
+	
+	/* Validate PDP type and address family */
+	if (pdp_info->pdp_type_nr == PDP_TYPE_N_IETF_IPv4)
 	{
-		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: received wrong PDP info", imsi);
+		/* IPv4 tunnel */
+		if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET)
+		{
+			DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv4 PDP type but wrong address family", imsi);
+			goto err;
+		}
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv4 tunnel established", imsi);
+	}
+	else if (pdp_info->pdp_type_nr == PDP_TYPE_N_IETF_IPv6)
+	{
+		/* IPv6 tunnel */
+		if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET6)
+		{
+			DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv6 PDP type but wrong address family", imsi);
+			goto err;
+		}
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv6 tunnel established", imsi);
+	}
+	else
+	{
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: unsupported PDP type: 0x%02x", imsi, pdp_info->pdp_type_nr);
 		goto err;
 	}
 

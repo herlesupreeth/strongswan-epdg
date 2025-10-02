@@ -329,7 +329,7 @@ static bool enqueue(private_osmo_epdg_gsup_client_t *this, gsup_request_t *req, 
 }
 
 METHOD(osmo_epdg_gsup_client_t, tunnel_request, osmo_epdg_gsup_response_t*,
-        private_osmo_epdg_gsup_client_t *this, const char *imsi)
+        private_osmo_epdg_gsup_client_t *this, const char *imsi, uint8_t pdp_type)
 {
 	struct osmo_gsup_message gsup_msg = {0};
 	struct msgb *msg;
@@ -348,6 +348,12 @@ METHOD(osmo_epdg_gsup_client_t, tunnel_request, osmo_epdg_gsup_response_t*,
 
 	gsup_msg.pco = pco;
 	gsup_msg.pco_len = 7;
+
+	/* Set PDP info based on requested PDP type */
+	gsup_msg.pdp_infos[0].context_id = 0;
+	gsup_msg.pdp_infos[0].pdp_type_nr = pdp_type;
+	gsup_msg.pdp_infos[0].pdp_type_org = PDP_TYPE_ORG_IETF;
+	gsup_msg.num_pdp_infos = 1;
 
 	msg = encode_to_msgb(&gsup_msg);
 	if (!msg)

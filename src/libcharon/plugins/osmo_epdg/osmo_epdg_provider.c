@@ -101,8 +101,29 @@ METHOD(simaka_provider_t, get_quintuplet, bool,
 		return FALSE;
 	}
 
+	/* Determine PDP type based on IKE configuration */
+	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4; /* Default to IPv4 */
+	ike_cfg_t *ike_cfg = ike_sa->get_ike_cfg(ike_sa);
+	if (ike_cfg)
+	{
+		host_t *local = ike_cfg->get_my_addr(ike_cfg);
+		host_t *remote = ike_cfg->get_other_addr(ike_cfg);
+		
+		/* Check if any of the addresses is IPv6 */
+		if ((local && local->get_family(local) == AF_INET6) ||
+		    (remote && remote->get_family(remote) == AF_INET6))
+		{
+			pdp_type = PDP_TYPE_N_IETF_IPv6;
+			DBG1(DBG_NET, "epdg_provider: Detected IPv6 auth request, using PDP_TYPE_N_IETF_IPv6");
+		}
+		else
+		{
+			DBG1(DBG_NET, "epdg_provider: Detected IPv4 auth request, using PDP_TYPE_N_IETF_IPv4");
+		}
+	}
+
 	osmo_epdg_gsup_response_t *resp = this->gsup->send_auth_request(
-			this->gsup, imsi, OSMO_GSUP_CN_DOMAIN_PS, NULL, NULL, apn, PDP_TYPE_N_IETF_IPv4);
+			this->gsup, imsi, OSMO_GSUP_CN_DOMAIN_PS, NULL, NULL, apn, pdp_type);
 	if (!resp)
 	{
 		DBG1(DBG_NET, "epdg_provider: Failed to send auth request.");
@@ -160,8 +181,9 @@ METHOD(attribute_provider_t, acquire_address, host_t*,
 {
 	/* yes this hurts. We can either move the attribute provider out of this class or do some pointer arithmetic to get the right this object */
 	this = container_of((void *) this, private_osmo_epdg_provider_t, public.attribute);
-	if (requested->get_family(requested) != AF_INET)
+	if (requested->get_family(requested) != AF_INET && requested->get_family(requested) != AF_INET6)
 	{
+		DBG1(DBG_NET, "epdg_provider: acquire_address: unsupported address family: %d", requested->get_family(requested));
 		return NULL;
 	}
 
