@@ -144,13 +144,7 @@ METHOD(listener_t, authorize, bool,
 	}
 
 	ue->set_state(ue, UE_WAIT_TUNNEL);
-	
-	/* Always request IPv4 PDP type - GSUP communication is always IPv4 */
-	/* The manager will decide the actual PDP type in the response */
-	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4;
-	DBG1(DBG_NET, "epdg_listener: Requesting IPv4 PDP type for tunnel request");
-	
-	resp = this->gsup->tunnel_request(this->gsup, imsi, pdp_type);
+	resp = this->gsup->tunnel_request(this->gsup, imsi);
 	if (!resp)
 	{
 		DBG1(DBG_NET, "epdg_listener: Tunnel Request: GSUP: couldn't send.");
@@ -178,7 +172,7 @@ METHOD(listener_t, authorize, bool,
 	}
 
 	pdp_info = &resp->gsup.pdp_infos[0];
-	
+
 	/* Validate PDP type and address family */
 	if (pdp_info->pdp_type_nr == PDP_TYPE_N_IETF_IPv4)
 	{

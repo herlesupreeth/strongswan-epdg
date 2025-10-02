@@ -23,34 +23,34 @@
  * @{ @ingroup osmo_epdg
  */
 
-#ifndef OSMO_EPDG_LISTENER_H_
-#define OSMO_EPDG_LISTENER_H_
-
-#include <bus/listeners/listener.h>
-#include "osmo_epdg_db.h"
-#include "gsup_client.h"
-
-typedef struct osmo_epdg_listener_t osmo_epdg_listener_t;
-
-/**
- * SIM listener implementation using a set of AKA functions.
- */
-struct osmo_epdg_listener_t {
-
-	/**
-	 * Implements listener_t interface.
-	 */
-	listener_t listener;
-
-	/**
-	 * Destroy a osmo_epdg_listener_t.
-	 */
-	void (*destroy)(osmo_epdg_listener_t *this);
-};
-
-/**
- * Create a osmo_epdg_listener instance.
- */
-osmo_epdg_listener_t *osmo_epdg_listener_create(osmo_epdg_db_t *db, osmo_epdg_gsup_client_t *gsup);
-
-#endif /** OSMO_EPDG_LISTENER_H_ @}*/
+ #ifndef OSMO_EPDG_LISTENER_H_
+ #define OSMO_EPDG_LISTENER_H_
+ 
+ #include <bus/listeners/listener.h>
+ #include "osmo_epdg_db.h"
+ #include "gsup_client.h"
+ 
+ typedef struct osmo_epdg_listener_t osmo_epdg_listener_t;
+ 
+ /**
+  * SIM listener implementation using a set of AKA functions.
+  */
+ struct osmo_epdg_listener_t {
+ 
+	 /**
+	  * Implements listener_t interface.
+	  */
+	 listener_t listener;
+ 
+	 /**
+	  * Destroy a osmo_epdg_listener_t.
+	  */
+	 void (*destroy)(osmo_epdg_listener_t *this);
+ };
+ 
+ /**
+  * Create a osmo_epdg_listener instance.
+  */
+ osmo_epdg_listener_t *osmo_epdg_listener_create(osmo_epdg_db_t *db, osmo_epdg_gsup_client_t *gsup);
+ 
+ #endif /** OSMO_EPDG_LISTENER_H_ @}*/

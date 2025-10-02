@@ -329,19 +329,18 @@ static bool enqueue(private_osmo_epdg_gsup_client_t *this, gsup_request_t *req, 
 }
 
 METHOD(osmo_epdg_gsup_client_t, tunnel_request, osmo_epdg_gsup_response_t*,
-        private_osmo_epdg_gsup_client_t *this, const char *imsi, uint8_t pdp_type)
+        private_osmo_epdg_gsup_client_t *this, const char *imsi)
 {
 	struct osmo_gsup_message gsup_msg = {0};
 	struct msgb *msg;
-	/* PCO requesting both IPv4 and IPv6 containers:
+	/* PCO requesting IPv4 and IPv6 containers:
 	 * 0x80 = PCO header (ext=1, protocol=0)
 	 * 0x000d = DNS Server IPv4 Address Request
 	 * 0x0003 = DNS Server IPv6 Address Request  
 	 * 0x000c = P-CSCF IPv4 Address Request
 	 * 0x0001 = P-CSCF IPv6 Address Request
-	 * 0x000e = P-CSCF IPv6 Address Request (alternative)
 	 */
-	const char *pco = "\x80\x00\x0d\x00\x03\x00\x0c\x00\x01\x00\x0e\x00";
+	const char *pco = "\x80\x00\x0d\x00\x03\x00\x0c\x00\x01";
 	bool timedout;
 
 	DBG1(DBG_NET, "epdg: gsupc: Tunnel Request Request for %s", imsi);
@@ -355,13 +354,7 @@ METHOD(osmo_epdg_gsup_client_t, tunnel_request, osmo_epdg_gsup_response_t*,
 	}
 
 	gsup_msg.pco = pco;
-	gsup_msg.pco_len = 13; /* Updated length for IPv4+IPv6 containers */
-
-	/* Set PDP info based on requested PDP type */
-	gsup_msg.pdp_infos[0].context_id = 0;
-	gsup_msg.pdp_infos[0].pdp_type_nr = pdp_type;
-	gsup_msg.pdp_infos[0].pdp_type_org = PDP_TYPE_ORG_IETF;
-	gsup_msg.num_pdp_infos = 1;
+	gsup_msg.pco_len = 9; /* Updated length for IPv4+IPv6 containers */
 
 	msg = encode_to_msgb(&gsup_msg);
 	if (!msg)
