@@ -145,12 +145,10 @@ METHOD(listener_t, authorize, bool,
 
 	ue->set_state(ue, UE_WAIT_TUNNEL);
 	
-	/* Determine PDP type based on requested address family */
-	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4; /* Default to IPv4 */
-	
-	/* For now, use IPv4 as default to avoid crashes during testing */
-	/* TODO: Implement proper IPv6 detection once basic functionality is stable */
-	DBG1(DBG_NET, "epdg_listener: Using default IPv4 PDP type for tunnel request");
+	/* Always request IPv4 PDP type - GSUP communication is always IPv4 */
+	/* The manager will decide the actual PDP type in the response */
+	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4;
+	DBG1(DBG_NET, "epdg_listener: Requesting IPv4 PDP type for tunnel request");
 	
 	resp = this->gsup->tunnel_request(this->gsup, imsi, pdp_type);
 	if (!resp)

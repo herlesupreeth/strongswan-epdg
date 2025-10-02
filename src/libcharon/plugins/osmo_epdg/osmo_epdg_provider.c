@@ -101,12 +101,8 @@ METHOD(simaka_provider_t, get_quintuplet, bool,
 		return FALSE;
 	}
 
-	/* Determine PDP type based on IKE configuration */
-	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4; /* Default to IPv4 */
-	
-	/* For now, use IPv4 as default to avoid crashes during testing */
-	/* TODO: Implement proper IPv6 detection once basic functionality is stable */
-	DBG1(DBG_NET, "epdg_provider: Using default IPv4 PDP type for auth request");
+	/* Always use IPv4 PDP type for auth requests - GSUP communication is always IPv4 */
+	uint8_t pdp_type = PDP_TYPE_N_IETF_IPv4;
 
 	osmo_epdg_gsup_response_t *resp = this->gsup->send_auth_request(
 			this->gsup, imsi, OSMO_GSUP_CN_DOMAIN_PS, NULL, NULL, apn, pdp_type);
