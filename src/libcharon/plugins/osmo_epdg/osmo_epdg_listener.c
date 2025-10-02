@@ -22,6 +22,7 @@
 #include <plugins/plugin.h>
 #include <errno.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include <osmocom/gsm/apn.h>
 
@@ -226,6 +227,9 @@ METHOD(listener_t, authorize, bool,
 		/* Common APCO protocol IDs (same as PCO) */
 		#define APCO_PID_DNS_SERVER_IPV4    0x000D
 		#define APCO_PID_P_CSCF_IPV4        0x000C
+		#define APCO_PID_DNS_SERVER_IPV6    0x0003
+		#define APCO_PID_P_CSCF_IPV6        0x0001
+		#define APCO_PID_P_CSCF_IPV6_ALT    0x000E
 
 		/* Decode APCO content as per 3GPP TS 24.008 */
 		uint8_t config_protocol = resp->gsup.pco[0] & 0x07; /* Bits 0-2 */
@@ -310,6 +314,61 @@ METHOD(listener_t, authorize, bool,
 					else
 					{
 						DBG1(DBG_NET, "APCO: P-CSCF IPv4 (0x%04x), invalid length: %d",
+							container_id, length);
+					}
+				}
+				break;
+				case APCO_PID_DNS_SERVER_IPV6:
+				{
+					if (length == 16)
+					{
+						osmo_epdg_attribute_t *entry;
+						char dns_addr[INET6_ADDRSTRLEN]; /* IPv6 address in string format */
+						struct in6_addr addr6;
+						memcpy(&addr6, &resp->gsup.pco[offset], 16);
+						inet_ntop(AF_INET6, &addr6, dns_addr, INET6_ADDRSTRLEN);
+						DBG1(DBG_NET, "APCO: DNS Server IPv6 (0x%04x): %s",
+							container_id, dns_addr);
+						host_t *host = host_create_from_string_and_family(dns_addr, AF_INET6, 0);
+						INIT(entry,
+							.type = INTERNAL_IP6_DNS,
+							.value = chunk_clone(host->get_address(host)),
+							.valid = TRUE,
+						);
+						ue->insert_attribute(ue, entry);
+						host->destroy(host);
+					}
+					else
+					{
+						DBG1(DBG_NET, "APCO: DNS Server IPv6 (0x%04x), invalid length: %d", 
+							container_id, length);
+					}
+				}
+				break;
+				case APCO_PID_P_CSCF_IPV6:
+				case APCO_PID_P_CSCF_IPV6_ALT:
+				{
+					if (length == 16)
+					{
+						osmo_epdg_attribute_t *entry;
+						char p_cscf_addr[INET6_ADDRSTRLEN]; /* IPv6 address in string format */
+						struct in6_addr addr6;
+						memcpy(&addr6, &resp->gsup.pco[offset], 16);
+						inet_ntop(AF_INET6, &addr6, p_cscf_addr, INET6_ADDRSTRLEN);
+						DBG1(DBG_NET, "APCO: P-CSCF IPv6 (0x%04x): %s",
+							container_id, p_cscf_addr);
+						host_t *host = host_create_from_string_and_family(p_cscf_addr, AF_INET6, 0);
+						INIT(entry,
+							.type = P_CSCF_IP6_ADDRESS,
+							.value = chunk_clone(host->get_address(host)),
+							.valid = TRUE,
+						);
+						ue->insert_attribute(ue, entry);
+						host->destroy(host);
+					}
+					else
+					{
+						DBG1(DBG_NET, "APCO: P-CSCF IPv6 (0x%04x), invalid length: %d",
 							container_id, length);
 					}
 				}
