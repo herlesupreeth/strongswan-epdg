@@ -160,7 +160,7 @@
  {
 	 /* yes this hurts. We can either move the attribute provider out of this class or do some pointer arithmetic to get the right this object */
 	 this = container_of((void *) this, private_osmo_epdg_provider_t, public.attribute);
-	 if (requested->get_family(requested) != AF_INET)
+	 if (requested->get_family(requested) != AF_INET && requested->get_family(requested) != AF_INET6)
 	 {
 		 return NULL;
 	 }
