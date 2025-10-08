@@ -407,7 +407,6 @@ METHOD(listener_t, ike_updown, bool,
 {
 	char imsi[16] = {0};
 	identification_t *peer_id;
-	osmo_epdg_ue_t *ue = NULL;
 	
 	/* Sanity check: ensure IKE_SA is valid */
 	if (!ike_sa)
@@ -435,33 +434,6 @@ METHOD(listener_t, ike_updown, bool,
 	
 	DBG1(DBG_NET, "epdg_listener: updown: imsi %s: IKE_SA went %s", 
 	     imsi, up ? "up" : "down");
-	
-	/* Handle IKE_SA going down - cleanup resources */
-	if (!up)
-	{
-		ue = this->db->get_subscriber(this->db, imsi);
-		if (ue)
-		{
-			uint32_t ue_id = ue->get_id(ue);
-			uint32_t ike_id = ike_sa->get_unique_id(ike_sa);
-			
-			/* Only remove if this UE is associated with this IKE_SA
-			 * to avoid removing a UE that's been recreated for a new connection */
-			if (ue_id == ike_id)
-			{
-				DBG1(DBG_NET, "epdg_listener: updown: removing subscriber %s (id=%u)", 
-				     imsi, ike_id);
-				this->db->remove_subscriber(this->db, imsi);
-			}
-			else
-			{
-				DBG1(DBG_NET, "epdg_listener: updown: skipping removal of subscriber %s "
-				     "(UE id=%u != IKE_SA id=%u, likely reconnected)", 
-				     imsi, ue_id, ike_id);
-			}
-			ue->put(ue);
-		}
-	}
 
 	return TRUE;
 }
