@@ -406,12 +406,62 @@ METHOD(listener_t, ike_updown, bool,
        private_osmo_epdg_listener_t *this, ike_sa_t *ike_sa, bool up)
 {
 	char imsi[16] = {0};
-	if (epdg_get_imsi_ike(ike_sa, imsi, sizeof(imsi)))
+	identification_t *peer_id;
+	osmo_epdg_ue_t *ue = NULL;
+	
+	/* Sanity check: ensure IKE_SA is valid */
+	if (!ike_sa)
 	{
-		DBG1(DBG_NET, "epdg_listener: updown: imsi UNKNOWN: IKE_SA went %s", up ? "up" : "down");
+		DBG1(DBG_NET, "epdg_listener: updown: IKE_SA is NULL");
 		return TRUE;
 	}
-	DBG1(DBG_NET, "epdg_listener: updown: imsi %s: IKE_SA went %s", imsi, up ? "up" : "down");
+	
+	/* Safely get peer identity - may be NULL during destruction */
+	peer_id = ike_sa->get_other_id(ike_sa);
+	if (!peer_id)
+	{
+		DBG1(DBG_NET, "epdg_listener: updown: peer_id is NULL, IKE_SA went %s", 
+		     up ? "up" : "down");
+		return TRUE;
+	}
+	
+	/* Extract IMSI from peer identity */
+	if (epdg_get_imsi(peer_id, imsi, sizeof(imsi)))
+	{
+		DBG1(DBG_NET, "epdg_listener: updown: imsi UNKNOWN: IKE_SA went %s", 
+		     up ? "up" : "down");
+		return TRUE;
+	}
+	
+	DBG1(DBG_NET, "epdg_listener: updown: imsi %s: IKE_SA went %s", 
+	     imsi, up ? "up" : "down");
+	
+	/* Handle IKE_SA going down - cleanup resources */
+	if (!up)
+	{
+		ue = this->db->get_subscriber(this->db, imsi);
+		if (ue)
+		{
+			uint32_t ue_id = ue->get_id(ue);
+			uint32_t ike_id = ike_sa->get_unique_id(ike_sa);
+			
+			/* Only remove if this UE is associated with this IKE_SA
+			 * to avoid removing a UE that's been recreated for a new connection */
+			if (ue_id == ike_id)
+			{
+				DBG1(DBG_NET, "epdg_listener: updown: removing subscriber %s (id=%u)", 
+				     imsi, ike_id);
+				this->db->remove_subscriber(this->db, imsi);
+			}
+			else
+			{
+				DBG1(DBG_NET, "epdg_listener: updown: skipping removal of subscriber %s "
+				     "(UE id=%u != IKE_SA id=%u, likely reconnected)", 
+				     imsi, ue_id, ike_id);
+			}
+			ue->put(ue);
+		}
+	}
 
 	return TRUE;
 }
