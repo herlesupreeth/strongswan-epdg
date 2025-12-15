@@ -57,12 +57,27 @@ int epdg_get_imsi_ike(ike_sa_t *ike_sa, char *imsi, size_t imsi_len)
 
 int epdg_get_imsi(identification_t *id, char *imsi, size_t imsi_len)
 {
-	chunk_t nai = id->get_encoding(id);
+	chunk_t nai;
+	
+	if (!id)
+	{
+		return -EINVAL;
+	}
+	
+	nai = id->get_encoding(id);
+	
+	/* Validate chunk pointer - may be NULL during IKE_SA destruction */
+	if (!nai.ptr || nai.len == 0)
+	{
+		DBG1(DBG_NET, "epdg: Invalid NAI chunk (NULL pointer or zero length)");
+		return -EINVAL;
+	}
+	
 	/* TODO: maybe use regex? */
 	/* 099942123456789@mnc042.mcc999.3gpp... */
 	if (nai.len < 17)
 	{
-		DBG1(DBG_NET, "epdg: Invalid NAI %s.", nai);
+		DBG1(DBG_NET, "epdg: Invalid NAI length %zu (expected >= 17)", nai.len);
 		return -EINVAL;
 	}
 
@@ -113,6 +128,11 @@ int epdg_get_apn(ike_sa_t *sa, char *apn, size_t apn_len)
 	identification_t* apn_id;
 	chunk_t apn_chunk;
 
+	if (!sa)
+	{
+		return -EINVAL;
+	}
+
 	apn_id = sa->get_my_id(sa);
 	if (!apn_id)
 	{
@@ -120,6 +140,14 @@ int epdg_get_apn(ike_sa_t *sa, char *apn, size_t apn_len)
 	}
 
 	apn_chunk = apn_id->get_encoding(apn_id);
+	
+	/* Validate chunk pointer - may be NULL during IKE_SA destruction */
+	if (!apn_chunk.ptr || apn_chunk.len == 0)
+	{
+		DBG1(DBG_NET, "epdg: Invalid APN chunk (NULL pointer or zero length)");
+		return -EINVAL;
+	}
+	
 	if (apn_chunk.len >= apn_len)
 	{
 		return -ENOMEM;
