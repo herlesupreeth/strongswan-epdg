@@ -182,27 +182,34 @@
 	 return address;
  }
  
- METHOD(attribute_provider_t, release_address, bool,
+METHOD(attribute_provider_t, release_address, bool,
 	 private_osmo_epdg_provider_t *this, linked_list_t *pools, host_t *address,
 	 ike_sa_t *ike_sa)
- {
+{
 	 this = container_of((void *) this, private_osmo_epdg_provider_t, public.attribute);
 	 osmo_epdg_ue_t *ue = this->db->get_subscriber_ike(this->db, ike_sa);
-	 host_t *ue_address = ue->get_address(ue);
+	 host_t *ue_address = NULL;
 	 bool found = FALSE;
- 
+
 	 if (!ue)
 	 {
 		 DBG1(DBG_NET, "epdg_provider: release_address: Failed to get the UE by IKE");
 		 return FALSE;
 	 }
- 
+
+	 ue_address = ue->get_address(ue);
+	 if (!ue_address)
+	 {
+		 ue->put(ue);
+		 return FALSE;
+	 }
+
 	 found = address->equals(address, ue_address);
 	 ue_address->destroy(ue_address);
 	 ue->put(ue);
- 
+
 	 return found;
- }
+}
  
  /* see attr_provider for similar usage */
  CALLBACK(attribute_enum_filter, bool,
