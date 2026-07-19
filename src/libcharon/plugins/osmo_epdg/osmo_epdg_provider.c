@@ -215,17 +215,20 @@ METHOD(attribute_provider_t, acquire_address, host_t*,
 	}
 
 	osmo_epdg_ue_t *ue = this->db->get_subscriber_ike(this->db, ike_sa);
-	host_t *address = NULL;
-	/* TODO: check if we want to limit the pool here as well to "epdg" similar what dhcp does */
-
 	if (!ue)
 	{
 		DBG1(DBG_NET, "epdg_provider: acquire_address: Failed to get the UE by IKE");
 		return NULL;
 	}
-
+	host_t *address = NULL;
+	/* TODO: check if we want to limit the pool here as well to "epdg" similar what dhcp does */
 	/* TODO: check for IPv4/IPv6 */
 	address = ue->get_address(ue);
+	if (!address)
+	{
+		DBG1(DBG_NET, "epdg_provider: acquire_address: Failed to get the UE address");
+		return NULL;
+	}
 	ue->put(ue);
 
 	return address;
@@ -237,14 +240,19 @@ METHOD(attribute_provider_t, release_address, bool,
 {
 	this = container_of((void *) this, private_osmo_epdg_provider_t, public.attribute);
 	osmo_epdg_ue_t *ue = this->db->get_subscriber_ike(this->db, ike_sa);
-	host_t *ue_address = ue->get_address(ue);
-	bool found = FALSE;
-
 	if (!ue)
 	{
 		DBG1(DBG_NET, "epdg_provider: release_address: Failed to get the UE by IKE");
 		return FALSE;
 	}
+	host_t *ue_address = ue->get_address(ue);
+	if (!ue_address)
+	{
+		DBG1(DBG_NET, "epdg_provider: release_address: Failed to get the UE address");
+		return FALSE;
+	}
+
+	bool found = FALSE;
 
 	found = address->equals(address, ue_address);
 	ue_address->destroy(ue_address);
