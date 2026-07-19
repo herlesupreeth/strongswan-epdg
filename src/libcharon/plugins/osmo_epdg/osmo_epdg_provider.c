@@ -141,10 +141,59 @@ METHOD(simaka_provider_t, resync, bool,
 	private_osmo_epdg_provider_t *this, identification_t *id,
 	char rand[AKA_RAND_LEN], char auts[AKA_AUTS_LEN])
 {
-	/* TODO: invalid auth data received */
-	/* prepare and fill up the struct */
-	/* send pdu blocking */
-	return FALSE;
+	char apn[APN_MAXLEN];
+	char imsi[17] = {0};
+	ike_sa_t *ike_sa;
+	chunk_t rand_chunk, auts_chunk;
+	osmo_epdg_gsup_response_t *resp;
+
+	if (epdg_get_imsi(id, imsi, sizeof(imsi) - 1))
+	{
+		DBG1(DBG_NET, "epdg: resync: Can't find IMSI in EAP identity.");
+		return FALSE;
+	}
+
+	ike_sa = charon->bus->get_sa(charon->bus);
+	if (!ike_sa)
+	{
+		DBG1(DBG_NET, "epdg: resync: Can't get ike_sa.");
+		return FALSE;
+	}
+
+	if (epdg_get_apn(ike_sa, apn, APN_MAXLEN))
+	{
+		DBG1(DBG_NET, "epdg: resync: Can't get APN.");
+		return FALSE;
+	}
+
+	rand_chunk = chunk_create((u_char *)rand, AKA_RAND_LEN);
+	auts_chunk = chunk_create((u_char *)auts, AKA_AUTS_LEN);
+
+	DBG1(DBG_NET, "epdg: resync: requesting SQN resynchronisation for %s", imsi);
+	resp = this->gsup->send_auth_request(this->gsup, imsi,
+			OSMO_GSUP_CN_DOMAIN_PS, &auts_chunk, &rand_chunk, apn,
+			PDP_TYPE_N_IETF_IPv4);
+	if (!resp)
+	{
+		DBG1(DBG_NET, "epdg: resync: Failed to send auth request.");
+		return FALSE;
+	}
+
+	if (resp->gsup.message_type != OSMO_GSUP_MSGT_SEND_AUTH_INFO_RESULT)
+	{
+		DBG1(DBG_NET, "epdg: resync: SendAuthInfo Error! Cause: %02x", resp->gsup.cause);
+		osmo_epdg_gsup_resp_free(resp);
+		return FALSE;
+	}
+
+	DBG1(DBG_NET, "epdg: resync: SQN resynchronisation accepted for %s", imsi);
+	/* The vector in this response is dropped on purpose: the provider API
+	 * cannot hand it back. strongSwan re-issues challenge() -> our
+	 * get_quintuplet() right after we return TRUE, which fetches a vector
+	 * generated from the now-corrected SQN. */
+	osmo_epdg_gsup_resp_free(resp);
+
+	return TRUE;
 }
 
 #ifndef container_of
