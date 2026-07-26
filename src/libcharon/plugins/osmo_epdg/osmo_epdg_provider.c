@@ -227,6 +227,7 @@ METHOD(attribute_provider_t, acquire_address, host_t*,
 	if (!address)
 	{
 		DBG1(DBG_NET, "epdg_provider: acquire_address: Failed to get the UE address");
+		ue->put(ue);
 		return NULL;
 	}
 	ue->put(ue);
@@ -249,6 +250,7 @@ METHOD(attribute_provider_t, release_address, bool,
 	if (!ue_address)
 	{
 		DBG1(DBG_NET, "epdg_provider: release_address: Failed to get the UE address");
+		ue->put(ue);
 		return FALSE;
 	}
 
