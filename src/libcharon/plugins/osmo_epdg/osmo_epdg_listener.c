@@ -22,6 +22,7 @@
 #include <plugins/plugin.h>
 #include <errno.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include <osmocom/gsm/apn.h>
 
@@ -165,18 +166,38 @@ METHOD(listener_t, authorize, bool,
 	/* validate Tunnel Response */
 	if ((resp->gsup.num_pdp_infos != 1) ||
 	    (!resp->gsup.pdp_infos[0].have_info) ||
-	    (resp->gsup.pdp_infos[0].pdp_type_org != PDP_TYPE_ORG_IETF) ||
-	    (resp->gsup.pdp_infos[0].pdp_type_nr != PDP_TYPE_N_IETF_IPv4))
+	    (resp->gsup.pdp_infos[0].pdp_type_org != PDP_TYPE_ORG_IETF))
 	{
 		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: received incomplete message/wrong content", imsi);
 		goto err;
 	}
 
 	pdp_info = &resp->gsup.pdp_infos[0];
-	/* if the sa_family is set, the address is valid */
-	if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET)
+
+	/* Validate PDP type and address family */
+	if (pdp_info->pdp_type_nr == PDP_TYPE_N_IETF_IPv4)
 	{
-		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: received wrong PDP info", imsi);
+		/* IPv4 tunnel */
+		if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET)
+		{
+			DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv4 PDP type but wrong address family", imsi);
+			goto err;
+		}
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv4 tunnel established", imsi);
+	}
+	else if (pdp_info->pdp_type_nr == PDP_TYPE_N_IETF_IPv6)
+	{
+		/* IPv6 tunnel */
+		if (pdp_info->pdp_address[0].u.sa.sa_family != AF_INET6)
+		{
+			DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv6 PDP type but wrong address family", imsi);
+			goto err;
+		}
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: IPv6 tunnel established", imsi);
+	}
+	else
+	{
+		DBG1(DBG_NET, "epdg_listener: Tunnel Response: IMSI %s: unsupported PDP type: 0x%02x", imsi, pdp_info->pdp_type_nr);
 		goto err;
 	}
 
@@ -206,6 +227,9 @@ METHOD(listener_t, authorize, bool,
 		/* Common APCO protocol IDs (same as PCO) */
 		#define APCO_PID_DNS_SERVER_IPV4    0x000D
 		#define APCO_PID_P_CSCF_IPV4        0x000C
+		#define APCO_PID_DNS_SERVER_IPV6    0x0003
+		#define APCO_PID_P_CSCF_IPV6        0x0001
+		#define APCO_PID_P_CSCF_IPV6_ALT    0x000E
 
 		/* Decode APCO content as per 3GPP TS 24.008 */
 		uint8_t config_protocol = resp->gsup.pco[0] & 0x07; /* Bits 0-2 */
@@ -294,6 +318,61 @@ METHOD(listener_t, authorize, bool,
 					}
 				}
 				break;
+				case APCO_PID_DNS_SERVER_IPV6:
+				{
+					if (length == 16)
+					{
+						osmo_epdg_attribute_t *entry;
+						char dns_addr[INET6_ADDRSTRLEN]; /* IPv6 address in string format */
+						struct in6_addr addr6;
+						memcpy(&addr6, &resp->gsup.pco[offset], 16);
+						inet_ntop(AF_INET6, &addr6, dns_addr, INET6_ADDRSTRLEN);
+						DBG1(DBG_NET, "APCO: DNS Server IPv6 (0x%04x): %s",
+							container_id, dns_addr);
+						host_t *host = host_create_from_string_and_family(dns_addr, AF_INET6, 0);
+						INIT(entry,
+							.type = INTERNAL_IP6_DNS,
+							.value = chunk_clone(host->get_address(host)),
+							.valid = TRUE,
+						);
+						ue->insert_attribute(ue, entry);
+						host->destroy(host);
+					}
+					else
+					{
+						DBG1(DBG_NET, "APCO: DNS Server IPv6 (0x%04x), invalid length: %d", 
+							container_id, length);
+					}
+				}
+				break;
+				case APCO_PID_P_CSCF_IPV6:
+				case APCO_PID_P_CSCF_IPV6_ALT:
+				{
+					if (length == 16)
+					{
+						osmo_epdg_attribute_t *entry;
+						char p_cscf_addr[INET6_ADDRSTRLEN]; /* IPv6 address in string format */
+						struct in6_addr addr6;
+						memcpy(&addr6, &resp->gsup.pco[offset], 16);
+						inet_ntop(AF_INET6, &addr6, p_cscf_addr, INET6_ADDRSTRLEN);
+						DBG1(DBG_NET, "APCO: P-CSCF IPv6 (0x%04x): %s",
+							container_id, p_cscf_addr);
+						host_t *host = host_create_from_string_and_family(p_cscf_addr, AF_INET6, 0);
+						INIT(entry,
+							.type = P_CSCF_IP6_ADDRESS,
+							.value = chunk_clone(host->get_address(host)),
+							.valid = TRUE,
+						);
+						ue->insert_attribute(ue, entry);
+						host->destroy(host);
+					}
+					else
+					{
+						DBG1(DBG_NET, "APCO: P-CSCF IPv6 (0x%04x), invalid length: %d",
+							container_id, length);
+					}
+				}
+				break;
 				default:
 					DBG1(DBG_NET, "APCO: Unknown container ID (0x%04x), length: %d", container_id, length);
 					break;
@@ -327,12 +406,34 @@ METHOD(listener_t, ike_updown, bool,
        private_osmo_epdg_listener_t *this, ike_sa_t *ike_sa, bool up)
 {
 	char imsi[16] = {0};
-	if (epdg_get_imsi_ike(ike_sa, imsi, sizeof(imsi)))
+	identification_t *peer_id;
+	
+	/* Sanity check: ensure IKE_SA is valid */
+	if (!ike_sa)
 	{
-		DBG1(DBG_NET, "epdg_listener: updown: imsi UNKNOWN: IKE_SA went %s", up ? "up" : "down");
+		DBG1(DBG_NET, "epdg_listener: updown: IKE_SA is NULL");
 		return TRUE;
 	}
-	DBG1(DBG_NET, "epdg_listener: updown: imsi %s: IKE_SA went %s", imsi, up ? "up" : "down");
+	
+	/* Safely get peer identity - may be NULL during destruction */
+	peer_id = ike_sa->get_other_id(ike_sa);
+	if (!peer_id)
+	{
+		DBG1(DBG_NET, "epdg_listener: updown: peer_id is NULL, IKE_SA went %s", 
+		     up ? "up" : "down");
+		return TRUE;
+	}
+	
+	/* Extract IMSI from peer identity */
+	if (epdg_get_imsi(peer_id, imsi, sizeof(imsi)))
+	{
+		DBG1(DBG_NET, "epdg_listener: updown: imsi UNKNOWN: IKE_SA went %s", 
+		     up ? "up" : "down");
+		return TRUE;
+	}
+	
+	DBG1(DBG_NET, "epdg_listener: updown: imsi %s: IKE_SA went %s", 
+	     imsi, up ? "up" : "down");
 
 	return TRUE;
 }

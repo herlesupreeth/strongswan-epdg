@@ -73,7 +73,11 @@ METHOD(osmo_epdg_db_t, create_subscriber, osmo_epdg_ue_t *,
 	ue = this->subscribers_imsi->remove(this->subscribers_imsi, imsi);
 	if (ue)
 	{
-		/* TODO: handle dups! Will remove it for now */
+		/* Handle duplicates/reconnections: 
+		 * Clean up old UE state and create fresh one with new unique_id */
+		uint32_t old_id = ue->get_id(ue);
+		DBG1(DBG_NET, "epdg_db: removing old subscriber %s (old_id=%u, new_id=%u)", 
+		     imsi, old_id, unique);
 		ue->put(ue);
 	}
 
