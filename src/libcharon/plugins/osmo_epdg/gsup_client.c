@@ -445,7 +445,9 @@ METHOD(osmo_epdg_gsup_client_t, send_auth_request, osmo_epdg_gsup_response_t*,
 		gsup_msg.rand = auts_rand->ptr;
 	}
 
-	gsup_msg.pdp_infos[0].context_id = 0;
+	/* Set context id to any value > 0 since libosmogsm doesn't encode APN if its 0. */
+	gsup_msg.pdp_infos[0].context_id = 1;
+	gsup_msg.pdp_infos[0].have_info = 1;
 	gsup_msg.pdp_infos[0].pdp_type_nr = pdp_type;
 	gsup_msg.pdp_infos[0].pdp_type_org = PDP_TYPE_ORG_IETF;
 
