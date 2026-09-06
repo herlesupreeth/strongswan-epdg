@@ -23,41 +23,41 @@
  * @{ @ingroup osmo_epdg
  */
 
- #ifndef OSMO_EPDG_PROVIDER_H_
- #define OSMO_EPDG_PROVIDER_H_
- 
- #include <simaka_provider.h>
- #include <attributes/attribute_provider.h>
- #include "osmo_epdg_db.h"
- #include "gsup_client.h"
- 
- typedef struct osmo_epdg_provider_t osmo_epdg_provider_t;
- 
- /**
-  * SIM provider implementation using a set of AKA functions.
-  */
- struct osmo_epdg_provider_t {
- 
-	 /**
-	  * Implements simaka_provider_t interface.
-	  */
-	 simaka_provider_t simaka;
- 
- 
-	 /**
-	  * Implements attribute_provider interface to assign config attributes and virtual ips.
-	  */
-	 attribute_provider_t attribute;
- 
-	 /**
-	  * Destroy a osmo_epdg_provider_t.
-	  */
-	 void (*destroy)(osmo_epdg_provider_t *this);
- };
- 
- /**
-  * Create a osmo_epdg_provider instance.
-  */
- osmo_epdg_provider_t *osmo_epdg_provider_create(osmo_epdg_db_t *db, osmo_epdg_gsup_client_t *gsup);
- 
- #endif /** OSMO_EPDG_PROVIDER_H_ @}*/
+#ifndef OSMO_EPDG_PROVIDER_H_
+#define OSMO_EPDG_PROVIDER_H_
+
+#include <simaka_provider.h>
+#include <attributes/attribute_provider.h>
+#include "osmo_epdg_db.h"
+#include "gsup_client.h"
+
+typedef struct osmo_epdg_provider_t osmo_epdg_provider_t;
+
+/**
+ * SIM provider implementation using a set of AKA functions.
+ */
+struct osmo_epdg_provider_t {
+
+	/**
+	 * Implements simaka_provider_t interface.
+	 */
+	simaka_provider_t simaka;
+
+
+	/**
+	 * Implements attribute_provider interface to assign config attributes and virtual ips.
+	 */
+	attribute_provider_t attribute;
+
+	/**
+	 * Destroy a osmo_epdg_provider_t.
+	 */
+	void (*destroy)(osmo_epdg_provider_t *this);
+};
+
+/**
+ * Create a osmo_epdg_provider instance.
+ */
+osmo_epdg_provider_t *osmo_epdg_provider_create(osmo_epdg_db_t *db, osmo_epdg_gsup_client_t *gsup);
+
+#endif /** OSMO_EPDG_PROVIDER_H_ @}*/
